@@ -2,13 +2,20 @@ package sgnv.anubis.app.vpn
 
 enum class VpnClientType(
     val displayName: String,
-    val packageName: String
+    val packageName: String,
+    /** null = standalone; same string = variants of one brand (grouped in picker). */
+    val brand: String? = null,
 ) {
-    V2RAY_NG("v2rayNG", "com.v2ray.ang"),
+    V2RAY_NG("Play", "com.v2ray.ang", brand = "v2rayNG"),
+    V2RAY_NG_FDROID("F-Droid", "com.v2ray.ang.fdroid", brand = "v2rayNG"),
     NEKO_BOX("NekoBox", "moe.nb4a"),
     HAPP("Happ", "com.happproxy"),
     V2RAY_TUN("v2rayTun", "com.v2raytun.android"),
     V2BOX("V2Box", "dev.hexasoftware.v2box");
+
+    /** "v2rayNG (Play)" for branded variants, "NekoBox" for standalones. */
+    val fullDisplayName: String
+        get() = if (brand != null) "$brand ($displayName)" else displayName
 
     companion object {
         fun fromPackageName(pkg: String): VpnClientType? =
@@ -24,7 +31,7 @@ data class SelectedVpnClient(
     val packageName: String
 ) {
     val displayName: String
-        get() = knownType?.displayName ?: packageName.substringAfterLast('.')
+        get() = knownType?.fullDisplayName ?: packageName.substringAfterLast('.')
 
     val controlMode: VpnControlMode
         get() = if (knownType != null) VpnClientControls.getControl(knownType).mode else VpnControlMode.MANUAL
@@ -63,7 +70,7 @@ data class VpnClientControl(
 object VpnClientControls {
 
     private val controls = mapOf(
-        // v2rayNG: widget broadcast toggles VPN on/off
+        // v2rayNG (Play): widget broadcast toggles VPN on/off
         // Works via Shizuku shell (bypasses exported=false)
         VpnClientType.V2RAY_NG to VpnClientControl(
             clientType = VpnClientType.V2RAY_NG,
@@ -72,6 +79,18 @@ object VpnClientControls {
                 "am", "broadcast",
                 "-a", "com.v2ray.ang.action.widget.click",
                 "-n", "com.v2ray.ang/.receiver.WidgetProvider"
+            ),
+        ),
+
+        // v2rayNG (F-Droid): same code, different applicationId — action prefix mirrors applicationId.
+        // Receiver class is still com.v2ray.ang.receiver.WidgetProvider (Java package unchanged in the fork).
+        VpnClientType.V2RAY_NG_FDROID to VpnClientControl(
+            clientType = VpnClientType.V2RAY_NG_FDROID,
+            mode = VpnControlMode.TOGGLE,
+            startCommand = arrayOf(
+                "am", "broadcast",
+                "-a", "com.v2ray.ang.fdroid.action.widget.click",
+                "-n", "com.v2ray.ang.fdroid/com.v2ray.ang.receiver.WidgetProvider"
             ),
         ),
 

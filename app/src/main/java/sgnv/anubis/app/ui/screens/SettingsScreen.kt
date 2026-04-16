@@ -80,60 +80,51 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // Known clients
-        VpnClientType.entries.forEach { client ->
-            val isInstalled = installedClients.contains(client)
-            val isSelected = selectedClient.packageName == client.packageName
-            val isFrozen = isInstalled && !viewModel.isVpnClientEnabled(client.packageName)
-            val control = VpnClientControls.getControl(client)
+        // Known clients — grouped by brand (v2rayNG Play / F-Droid etc. live under one header)
+        val grouped = VpnClientType.entries.groupBy { it.brand ?: "__standalone__${it.name}" }
+        grouped.forEach { (_, variants) ->
+            val brand = variants.first().brand
+            val installedVariants = variants.filter { installedClients.contains(it) }
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clickable(enabled = isInstalled) {
-                        viewModel.selectVpnClient(SelectedVpnClient.fromKnown(client))
-                    },
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surface
+            if (brand != null && installedVariants.size >= 2) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    brand,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
-            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            client.displayName,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isInstalled) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
-                        val modeText = when {
-                            !isInstalled -> "Не установлен"
-                            isFrozen -> "Заморожен!"
-                            control.mode == VpnControlMode.SEPARATE -> "Полное управление"
-                            control.mode == VpnControlMode.TOGGLE -> "Авто вкл. / принудит. выкл."
-                            else -> "Ручной режим"
-                        }
-                        Text(
-                            modeText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = when {
-                                isFrozen -> MaterialTheme.colorScheme.error
-                                !isInstalled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                control.mode == VpnControlMode.SEPARATE -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                    installedVariants.forEach { client ->
+                        VpnClientTile(
+                            client = client,
+                            label = client.displayName,
+                            isInstalled = true,
+                            isSelected = selectedClient.packageName == client.packageName,
+                            isFrozen = !viewModel.isVpnClientEnabled(client.packageName),
+                            onClick = { viewModel.selectVpnClient(SelectedVpnClient.fromKnown(client)) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                    RadioButton(selected = isSelected, onClick = {
-                        if (isInstalled) viewModel.selectVpnClient(SelectedVpnClient.fromKnown(client))
-                    }, enabled = isInstalled)
                 }
+            } else {
+                val client = installedVariants.firstOrNull() ?: variants.first()
+                val label = client.fullDisplayName
+                val isInstalled = installedClients.contains(client)
+                VpnClientTile(
+                    client = client,
+                    label = label,
+                    isInstalled = isInstalled,
+                    isSelected = selectedClient.packageName == client.packageName,
+                    isFrozen = isInstalled && !viewModel.isVpnClientEnabled(client.packageName),
+                    onClick = {
+                        if (isInstalled) viewModel.selectVpnClient(SelectedVpnClient.fromKnown(client))
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                )
             }
         }
 
@@ -414,4 +405,62 @@ fun SettingsScreen(
         }
     }
 
+}
+
+@Composable
+private fun VpnClientTile(
+    client: VpnClientType,
+    label: String,
+    isInstalled: Boolean,
+    isSelected: Boolean,
+    isFrozen: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val control = VpnClientControls.getControl(client)
+    Card(
+        modifier = modifier.clickable(enabled = isInstalled) { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isInstalled) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
+                val modeText = when {
+                    !isInstalled -> "Не установлен"
+                    isFrozen -> "Заморожен!"
+                    control.mode == VpnControlMode.SEPARATE -> "Полное управление"
+                    control.mode == VpnControlMode.TOGGLE -> "Авто вкл. / принудит. выкл."
+                    else -> "Ручной режим"
+                }
+                Text(
+                    modeText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when {
+                        isFrozen -> MaterialTheme.colorScheme.error
+                        !isInstalled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        control.mode == VpnControlMode.SEPARATE -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            RadioButton(
+                selected = isSelected,
+                onClick = { if (isInstalled) onClick() },
+                enabled = isInstalled
+            )
+        }
+    }
 }

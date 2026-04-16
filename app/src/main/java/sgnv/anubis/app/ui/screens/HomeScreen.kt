@@ -135,7 +135,7 @@ fun HomeScreen(
                     )
                     Text(
                         when {
-                            vpnActive && activeVpnClient != null -> "VPN: ${activeVpnClient!!.displayName}"
+                            vpnActive && activeVpnClient != null -> "VPN: ${activeVpnClient!!.fullDisplayName}"
                             vpnActive && activeVpnPackage != null -> "VPN: $activeVpnPackage"
                             vpnActive -> "VPN активен"
                             else -> "VPN выключен"
